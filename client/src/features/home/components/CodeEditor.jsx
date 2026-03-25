@@ -5,7 +5,6 @@ import { EditorFallback } from './Loader';
 const MonacoEditor = lazy(() => import('@monaco-editor/react'));
 
 export default function CodeEditor({ value, onChange, language }) {
-  // Ensure the language matches Monaco's supported language IDs
   const getMonacoLanguage = (lang) => {
     const map = {
       javascript: 'javascript',
@@ -30,12 +29,19 @@ export default function CodeEditor({ value, onChange, language }) {
           value={value}
           onChange={(val) => onChange(val || '')}
           options={{
-            minimap: { enabled: false }, // Hides minimap for cleaner look
-            fontSize: 14,
+            minimap: { enabled: false },
+            fontSize: 13,
+            lineHeight: 22,
             wordWrap: 'on',
             scrollBeyondLastLine: false,
-            padding: { top: 16, bottom: 16 },
-            fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+            padding: { top: 20, bottom: 20 },
+            fontFamily: "'IBM Plex Mono', 'Fira Code', monospace",
+            fontLigatures: true,
+            renderLineHighlight: 'gutter',
+            cursorBlinking: 'phase',
+            cursorSmoothCaretAnimation: 'on',
+            smoothScrolling: true,
+            bracketPairColorization: { enabled: true },
           }}
           loading={<EditorFallback />}
         />

@@ -1,0 +1,222 @@
+@import "tailwindcss";
+
+@theme {
+    /* Core Palette — Terminal Noir */
+    --color-base: #080C10;
+    --color-base-2: #0D1117;
+    --color-surface: #111820;
+    --color-surface-2: #161E28;
+    --color-surface-3: #1C2530;
+
+    /* Cyan accent system */
+    --color-accent: #00D4FF;
+    --color-accent-hover: #00B8E0;
+    --color-accent-dim: rgba(0, 212, 255, 0.12);
+    --color-accent-glow: rgba(0, 212, 255, 0.35);
+    --color-accent-light: #7EEEFF;
+
+    /* Secondary accent — amber for warnings/bugs */
+    --color-warn: #F59E0B;
+    --color-warn-dim: rgba(245, 158, 11, 0.12);
+
+    /* Success */
+    --color-success: #10D9A0;
+    --color-success-dim: rgba(16, 217, 160, 0.12);
+
+    /* Text */
+    --color-text-primary: #E8EDF5;
+    --color-text-secondary: #6B7D94;
+    --color-text-muted: #3D4F63;
+
+    /* Borders */
+    --color-border: #1E2D3D;
+    --color-border-bright: #2A3F55;
+    --color-border-accent: rgba(0, 212, 255, 0.25);
+
+    /* Fonts */
+    --font-mono: 'IBM Plex Mono', 'Fira Code', monospace;
+    --font-sans: 'Syne', system-ui, sans-serif;
+
+    /* Animations */
+    --animate-spin-slow: spin 1.2s linear infinite;
+    --animate-fade-in: fadeIn 0.4s ease-out;
+    --animate-slide-up: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    --animate-slide-in-right: slideInRight 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    --animate-pulse-accent: pulseAccent 2.5s ease-in-out infinite;
+    --animate-scan: scan 8s linear infinite;
+    --animate-glow-pulse: glowPulse 3s ease-in-out infinite;
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+        }
+
+        to {
+            opacity: 1;
+        }
+    }
+
+    @keyframes slideUp {
+        from {
+            opacity: 0;
+            transform: translateY(16px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes slideInRight {
+        from {
+            opacity: 0;
+            transform: translateX(20px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    @keyframes pulseAccent {
+
+        0%,
+        100% {
+            box-shadow: 0 0 0 0 rgba(0, 212, 255, 0.3);
+        }
+
+        50% {
+            box-shadow: 0 0 0 8px rgba(0, 212, 255, 0);
+        }
+    }
+
+    @keyframes scan {
+        0% {
+            transform: translateY(-100%);
+        }
+
+        100% {
+            transform: translateY(100vh);
+        }
+    }
+
+    @keyframes glowPulse {
+
+        0%,
+        100% {
+            opacity: 0.4;
+        }
+
+        50% {
+            opacity: 0.8;
+        }
+    }
+
+    @keyframes typewriter {
+        from {
+            width: 0;
+        }
+
+        to {
+            width: 100%;
+        }
+    }
+
+    @keyframes blink {
+
+        0%,
+        100% {
+            opacity: 1;
+        }
+
+        50% {
+            opacity: 0;
+        }
+    }
+
+    @keyframes shimmer {
+        0% {
+            background-position: -200% center;
+        }
+
+        100% {
+            background-position: 200% center;
+        }
+    }
+
+    @keyframes borderGlow {
+
+        0%,
+        100% {
+            border-color: rgba(0, 212, 255, 0.2);
+        }
+
+        50% {
+            border-color: rgba(0, 212, 255, 0.5);
+        }
+    }
+
+    @keyframes float {
+
+        0%,
+        100% {
+            transform: translateY(0px);
+        }
+
+        50% {
+            transform: translateY(-6px);
+        }
+    }
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--color-border-bright);
+    border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 212, 255, 0.3);
+}
+
+/* Selection */
+::selection {
+    background: rgba(0, 212, 255, 0.2);
+    color: var(--color-accent-light);
+}
+
+/* Noise texture overlay */
+.noise-overlay::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.4;
+}
+
+/* Scan line effect */
+.scanlines::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(0deg,
+            transparent,
+            transparent 2px,
+            rgba(0, 0, 0, 0.03) 2px,
+            rgba(0, 0, 0, 0.03) 4px);
+    pointer-events: none;
+    z-index: 1;
+}
