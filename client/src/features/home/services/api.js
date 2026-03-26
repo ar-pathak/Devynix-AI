@@ -1,21 +1,27 @@
 // src/services/api.js
+const API_BASE_URL = 'http://localhost:5000/api'; 
 
 export const analyzeCode = async (code, language) => {
-  // Simulate network delay for 2 seconds to test the awesome loader
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        explanation: `This ${language} code defines a function that handles asynchronous operations. It follows standard practices for fetching and processing data.`,
-        bugs: [
-          "No error handling for edge cases (e.g., if user_id is null).",
-          "Potential memory leak if the promise doesn't resolve in certain environments."
-        ],
-        improvements: [
-          "Add strict type checking for the parameters.",
-          "Implement a retry mechanism for failed network requests.",
-          "Extract the API URL into a configuration file or environment variable."
-        ]
-      });
-    }, 2000);
-  });
+  try {
+    const response = await fetch(`${API_BASE_URL}/analyze`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ code, language }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      // UPDATE: Ab yeh real error detail throw karega UI par
+      throw new Error(errorData.details || errorData.error || 'Failed to analyze code');
+    }
+
+    const data = await response.json();
+    return data;
+
+  } catch (error) {
+    console.error("API Connection Error:", error);
+    throw error;
+  }
 };
