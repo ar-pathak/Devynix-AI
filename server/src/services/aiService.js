@@ -1,142 +1,65 @@
-const { OpenAI } = require("openai");
-const { GoogleGenerativeAI } = require("@google/generative-ai");
-require("dotenv").config();
+const { callGithub } = require('./githubService');
+const { callGroq } = require('./groqService');
+const { callGemini } = require('./geminiService');
+const { callOpenRouter } = require('./openRouterService');
 
-// ─── ENV DEBUG (IMPORTANT) ─────────────────────────
-console.log("GEMINI:", process.env.GEMINI_API_KEY ? "OK" : "MISSING");
-console.log("OPENROUTER:", process.env.OPENROUTER_API_KEY ? "OK" : "MISSING");
-console.log("GROQ:", process.env.GROQ_API_KEY ? "OK" : "MISSING");
-console.log("GITHUB:", process.env.GITHUB_TOKEN ? "OK" : "MISSING");
+// Global index track karne ke liye (Round-Robin Logic)
+let currentProviderIndex = 0;
 
-// ─── CLIENTS ───────────────────────────────────────
-
-// GitHub Models
-const githubClient = new OpenAI({
-    baseURL: "https://models.github.ai/inference",
-    apiKey: process.env.GITHUB_TOKEN,
-    timeout: 7000,
-});
-
-// Groq
-const groqClient = new OpenAI({
-    baseURL: "https://api.groq.com/openai/v1",
-    apiKey: process.env.GROQ_API_KEY,
-    timeout: 5000,
-});
-
-// OpenRouter (FIXED)
-const openrouterClient = new OpenAI({
-    baseURL: "https://openrouter.ai/api/v1",
-    apiKey: process.env.OPENROUTER_API_KEY,
-    timeout: 8000,
-    defaultHeaders: {
-        "HTTP-Referer": "https://yourdomain.com", // 🔥 change this in prod
-        "X-Title": "Devynix Analyzer",
-    },
-});
-
-// Gemini (FIXED MODEL)
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
-// ─── SAFE JSON PARSER ──────────────────────────────
 function cleanAndParseJSON(text) {
-    if (!text) throw new Error("Empty response from AI");
-
-    const cleanedText = text
-        .replace(/```json/i, "")
-        .replace(/```/g, "")
-        .trim();
-
-    try {
-        return JSON.parse(cleanedText);
-    } catch (err) {
-        console.error("❌ Invalid JSON received:\n", cleanedText);
-        throw new Error("AI returned invalid JSON");
-    }
+    if (!text) throw new Error("Empty response");
+    const cleanedText = text.replace(/```json/i, '').replace(/```/g, '').trim();
+    return JSON.parse(cleanedText);
 }
 
-// ─── MAIN FUNCTION ─────────────────────────────────
 async function analyzeWithAI(code, language) {
-    const systemPrompt = `You are an expert Senior Software Engineer and Code Analyzer.
-
-Analyze the following ${language} code.
-
-You MUST respond STRICTLY in JSON format:
-
-{
-  "explanation": "2-3 sentence explanation",
-  "bugs": ["bug1", "bug2"],
-  "improvements": ["improvement1", "improvement2"]
-}
-
-No markdown. No extra text. Only JSON.`;
+    const systemPrompt = `You are an expert Senior Software Engineer and Code Analyzer. 
+    Analyze the following ${language} code. 
+    You MUST respond STRICTLY in the following JSON format. Do not include markdown blocks.
+    {
+      "explanation": "A clear, concise 2-3 sentence explanation.",
+      "bugs": ["Describe bug 1", "Describe bug 2"],
+      "improvements": ["Suggest improvement 1"]
+    }`;
 
     const messagesArray = [
         { role: "system", content: systemPrompt },
-        { role: "user", content: code },
+        { role: "user", content: code }
     ];
 
-    // ─── ATTEMPT 1: GITHUB ─────────────────────────
-      try {
-        console.log("🟢 GitHub Models...");
-        const response = await githubClient.chat.completions.create({
-          model: "openai/gpt-4o-mini",
-          temperature: 0.1,
-          messages: messagesArray,
-        });
+    // Array of all providers
+    const providers = [
+        { name: "GITHUB", fetch: () => callGithub(messagesArray) },
+        { name: "GROQ", fetch: () => callGroq(messagesArray) },
+        { name: "GEMINI", fetch: () => callGemini(systemPrompt, code) },
+        { name: "OPENROUTER", fetch: () => callOpenRouter(messagesArray) }
+    ];
 
-        return cleanAndParseJSON(response.choices[0].message.content);
-      } catch (e) {
-        console.warn("⚠️ GitHub failed:", e.message);
-      }
+    // Round-Robin Queue banana (Har request pe order badal jayega)
+    const startIndex = currentProviderIndex;
+    currentProviderIndex = (currentProviderIndex + 1) % providers.length; // Agli baar agla provider pehle aayega
 
-    // ─── ATTEMPT 2: GROQ ───────────────────────────
-      try {
-        console.log("🟡 Groq...");
-        const response = await groqClient.chat.completions.create({
-          model: "llama-3.1-8b-instant",
-          temperature: 0.1,
-          messages: messagesArray,
-        });
-
-        return cleanAndParseJSON(response.choices[0].message.content);
-      } catch (e) {
-        console.warn("⚠️ Groq failed:", e.message);
-      }
-
-    // ─── ATTEMPT 3: GEMINI (FIXED) ─────────────────
-    try {
-        console.log("🟠 Gemini...");
-        const model = genAI.getGenerativeModel({
-            model: "gemini-3-flash-preview",
-        });
-
-        const fullPrompt = `${systemPrompt}\n\nCode:\n${code}`;
-
-        const result = await model.generateContent(fullPrompt);
-        const text = result.response.text();
-
-        return cleanAndParseJSON(text);
-    } catch (e) {
-        console.warn("⚠️ Gemini failed:", e.message);
+    // Is specific request ke liye queue set karna
+    const requestQueue = [];
+    for (let i = 0; i < providers.length; i++) {
+        requestQueue.push(providers[(startIndex + i) % providers.length]);
     }
 
-    // ─── ATTEMPT 4: OPENROUTER (FIXED) ─────────────
-    try {
-        console.log("🔴 OpenRouter...");
-        const response = await openrouterClient.chat.completions.create({
-            model: "nvidia/nemotron-3-super-120b-a12b:free",
-            temperature: 0.1,
-            messages: messagesArray,
-        });
+    console.log(`\n🚦 NEW REQUEST: Starting at Provider [${requestQueue[0].name}]`);
 
-        return cleanAndParseJSON(response.choices[0].message.content);
-    } catch (e) {
-        console.error("❌ OpenRouter failed:", e.message);
-        throw new Error(
-            "All AI providers failed. Try again in a few seconds."
-        );
+    // Queue mein ek-ek karke try karna
+    for (const provider of requestQueue) {
+        try {
+            console.log(`➡️ Sending to ${provider.name}...`);
+            const rawAiText = await provider.fetch();
+            return cleanAndParseJSON(rawAiText);
+        } catch (e) {
+            console.log(`🔴 ${provider.name} failed: Moving to next in queue...`);
+        }
     }
+
+    // Agar saare 4 providers (aur unke andar ke 14 models) fail ho jayein!
+    throw new Error("All AI systems are currently under heavy load. Please try again in 5 seconds.");
 }
 
 module.exports = { analyzeWithAI };
