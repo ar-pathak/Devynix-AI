@@ -78,9 +78,9 @@ function buildDecorationSpec(analysisData, fixedSnippets, hoverSnippet) {
     })
   }
 
-  fixedSnippets.forEach((snippet) => {
-    if (snippet) {
-      spec.push({ snippet, kind: 'fixed' })
+  fixedSnippets.forEach((fixedItem) => {
+    if (fixedItem) {
+      spec.push({ ...fixedItem, kind: 'fixed' })
     }
   })
 
@@ -121,10 +121,14 @@ function replaceSnippetInCode(fullCode, originalSnippet, replacementSnippet) {
   const alignedReplacement = alignReplacementIndentation(replacementSnippet, originalSnippet)
 
   if (fullCode.includes(originalSnippet)) {
-    return {
-      updatedCode: fullCode.replace(originalSnippet, alignedReplacement),
-      appliedSnippet: alignedReplacement,
-    }
+      return {
+        updatedCode: fullCode.replace(originalSnippet, alignedReplacement),
+        appliedSnippet: alignedReplacement,
+        appliedRange: {
+          startLine: fullCode.slice(0, fullCode.indexOf(originalSnippet)).split('\n').length,
+          endLine: fullCode.slice(0, fullCode.indexOf(originalSnippet)).split('\n').length + alignedReplacement.split('\n').length - 1,
+        },
+      }
   }
 
   const fullLines = fullCode.split('\n')
@@ -142,6 +146,10 @@ function replaceSnippetInCode(fullCode, originalSnippet, replacementSnippet) {
           ...fullLines.slice(index + snippetLength),
         ].join('\n'),
         appliedSnippet: alignedReplacement,
+        appliedRange: {
+          startLine: index + 1,
+          endLine: index + alignedReplacement.split('\n').length,
+        },
       }
     }
   }
@@ -229,17 +237,20 @@ export default function WorkspacePage({ language }) {
     }
   }
 
-  const flashAppliedSnippet = (snippet) => {
-    if (!snippet) {
+  const flashAppliedSnippet = (appliedChange) => {
+    if (!appliedChange?.snippet && !appliedChange?.range) {
       return
     }
 
-    setFixedSnippets((prev) => [...prev, snippet])
+    const highlightId = `${Date.now()}-${Math.random()}`
+    const highlight = { ...appliedChange, id: highlightId }
+
+    setFixedSnippets((prev) => [...prev, highlight])
 
     const timeoutId = window.setTimeout(() => {
-      setFixedSnippets((prev) => prev.filter((existingSnippet) => existingSnippet !== snippet))
+      setFixedSnippets((prev) => prev.filter((existingHighlight) => existingHighlight.id !== highlightId))
       fixedSnippetTimeoutsRef.current = fixedSnippetTimeoutsRef.current.filter((id) => id !== timeoutId)
-    }, 4000)
+    }, 6000)
 
     fixedSnippetTimeoutsRef.current.push(timeoutId)
   }
@@ -275,7 +286,10 @@ export default function WorkspacePage({ language }) {
 
       setCode(replacementResult.updatedCode)
       setHoverSnippet(null)
-      flashAppliedSnippet(replacementResult.appliedSnippet)
+      flashAppliedSnippet({
+        snippet: replacementResult.appliedSnippet,
+        range: replacementResult.appliedRange,
+      })
 
       setAnalysis((current) => {
         if (!current) {

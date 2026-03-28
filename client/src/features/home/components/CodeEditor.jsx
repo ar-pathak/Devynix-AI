@@ -1,16 +1,20 @@
-import React, { Suspense, lazy, useRef, useEffect, useCallback } from 'react';
-import { EditorFallback } from './Loader';
+import React, { Suspense, lazy, useRef, useEffect, useCallback } from 'react'
+import { EditorFallback } from './Loader'
 
-const MonacoEditor = lazy(() => import('@monaco-editor/react'));
+const MonacoEditor = lazy(() => import('@monaco-editor/react'))
 
 const LANG_MAP = {
-  javascript: 'javascript', typescript: 'typescript', python: 'python',
-  rust: 'rust', go: 'go', java: 'java', cpp: 'cpp', csharp: 'csharp',
-};
+  javascript: 'javascript',
+  typescript: 'typescript',
+  python: 'python',
+  rust: 'rust',
+  go: 'go',
+  java: 'java',
+  cpp: 'cpp',
+  csharp: 'csharp',
+}
 
-// ─── CSS injected once into Monaco's shadow DOM ───────────────────────────────
 const DECORATION_CSS = `
-  /* Bug lines — amber glow, like VS Code error highlight */
   .devynix-bug-line {
     background: rgba(245, 158, 11, 0.10) !important;
     border-left: 2px solid rgba(245, 158, 11, 0.8) !important;
@@ -19,7 +23,6 @@ const DECORATION_CSS = `
     background: rgba(245, 158, 11, 0.25) !important;
   }
 
-  /* Improvement lines — cyan/blue, like Copilot suggestion */
   .devynix-improvement-line {
     background: rgba(0, 212, 255, 0.08) !important;
     border-left: 2px solid rgba(0, 212, 255, 0.7) !important;
@@ -28,77 +31,95 @@ const DECORATION_CSS = `
     background: rgba(0, 212, 255, 0.2) !important;
   }
 
-  /* Fixed lines — green, exactly like GitHub Copilot accepted diff */
   .devynix-fixed-line {
-    background: rgba(16, 217, 160, 0.13) !important;
-    border-left: 2px solid rgba(16, 217, 160, 0.9) !important;
+    background: linear-gradient(90deg, rgba(16, 217, 160, 0.24), rgba(16, 217, 160, 0.12)) !important;
+    border-left: 3px solid rgba(16, 217, 160, 1) !important;
+    box-shadow: inset 0 0 0 1px rgba(16, 217, 160, 0.18);
   }
   .devynix-fixed-gutter {
-    background: rgba(16, 217, 160, 0.3) !important;
+    background: rgba(16, 217, 160, 0.45) !important;
   }
 
-  /* Hover preview — softer tint */
   .devynix-hover-line {
     background: rgba(255, 255, 255, 0.04) !important;
     border-left: 2px solid rgba(255,255,255,0.15) !important;
   }
-`;
+`
 
 function injectCSS() {
-  if (document.getElementById('devynix-decoration-css')) return;
-  const style = document.createElement('style');
-  style.id = 'devynix-decoration-css';
-  style.textContent = DECORATION_CSS;
-  document.head.appendChild(style);
+  if (document.getElementById('devynix-decoration-css')) return
+
+  const style = document.createElement('style')
+  style.id = 'devynix-decoration-css'
+  style.textContent = DECORATION_CSS
+  document.head.appendChild(style)
 }
 
-// ─── Find line range of a snippet inside full code ───────────────────────────
-// Returns { startLine, endLine } (1-based) or null if not found
 function findSnippetRange(fullCode, snippet) {
-  if (!snippet || !snippet.trim()) return null;
+  if (!snippet || !snippet.trim()) return null
 
-  const codeLines    = fullCode.split('\n');
-  const snippetLines = snippet.split('\n').map(l => l.trimEnd());
-  const snippetLen   = snippetLines.length;
+  const codeLines = fullCode.split('\n')
+  const snippetLines = snippet.split('\n').map((line) => line.trimEnd())
+  const snippetLength = snippetLines.length
 
-  for (let i = 0; i <= codeLines.length - snippetLen; i++) {
-    const window = codeLines.slice(i, i + snippetLen).map(l => l.trimEnd());
-    if (window.join('\n') === snippetLines.join('\n')) {
-      return { startLine: i + 1, endLine: i + snippetLen };
+  for (let index = 0; index <= codeLines.length - snippetLength; index += 1) {
+    const windowLines = codeLines.slice(index, index + snippetLength).map((line) => line.trimEnd())
+
+    if (windowLines.join('\n') === snippetLines.join('\n')) {
+      return { startLine: index + 1, endLine: index + snippetLength }
     }
   }
-  return null;
+
+  return null
 }
 
-// ─── Build Monaco delta decorations array ────────────────────────────────────
+function resolveDecorationRange(monaco, code, decoration) {
+  if (decoration.range?.startLine && decoration.range?.endLine) {
+    return new monaco.Range(decoration.range.startLine, 1, decoration.range.endLine, 1)
+  }
+
+  const snippetRange = findSnippetRange(code, decoration.snippet)
+
+  if (!snippetRange) {
+    return null
+  }
+
+  return new monaco.Range(snippetRange.startLine, 1, snippetRange.endLine, 1)
+}
+
 function buildDecorations(monaco, code, decorationSpec) {
-  const result = [];
+  const result = []
 
-  decorationSpec.forEach(({ snippet, kind }) => {
-    const range = findSnippetRange(code, snippet);
-    if (!range) return;
+  decorationSpec.forEach((decoration) => {
+    const { kind } = decoration
+    const range = resolveDecorationRange(monaco, code, decoration)
 
-    let lineClass, gutterClass, hoverMessage;
+    if (!range) return
+
+    let lineClass
+    let gutterClass
+    let hoverMessage
+
     if (kind === 'bug') {
-      lineClass   = 'devynix-bug-line';
-      gutterClass = 'devynix-bug-gutter';
-      hoverMessage = '⚠ Bug detected here';
+      lineClass = 'devynix-bug-line'
+      gutterClass = 'devynix-bug-gutter'
+      hoverMessage = 'Bug detected here'
     } else if (kind === 'improvement') {
-      lineClass   = 'devynix-improvement-line';
-      gutterClass = 'devynix-improvement-gutter';
-      hoverMessage = '✦ Improvement suggested here';
+      lineClass = 'devynix-improvement-line'
+      gutterClass = 'devynix-improvement-gutter'
+      hoverMessage = 'Improvement suggested here'
     } else if (kind === 'fixed') {
-      lineClass   = 'devynix-fixed-line';
-      gutterClass = 'devynix-fixed-gutter';
-      hoverMessage = '✓ Fixed by Devynix AI';
+      lineClass = 'devynix-fixed-line'
+      gutterClass = 'devynix-fixed-gutter'
+      hoverMessage = 'Applied in editor'
     } else {
-      lineClass   = 'devynix-hover-line';
-      gutterClass = '';
-      hoverMessage = '';
+      lineClass = 'devynix-hover-line'
+      gutterClass = ''
+      hoverMessage = ''
     }
 
     result.push({
-      range: new monaco.Range(range.startLine, 1, range.endLine, 1),
+      range,
       options: {
         isWholeLine: true,
         className: lineClass,
@@ -110,7 +131,7 @@ function buildDecorations(monaco, code, decorationSpec) {
             : kind === 'improvement'
             ? 'rgba(0,212,255,0.7)'
             : kind === 'fixed'
-            ? 'rgba(16,217,160,0.9)'
+            ? 'rgba(16,217,160,0.95)'
             : 'rgba(255,255,255,0.1)',
           position: 4,
         },
@@ -119,50 +140,49 @@ function buildDecorations(monaco, code, decorationSpec) {
             ? 'rgba(245,158,11,0.5)'
             : kind === 'improvement'
             ? 'rgba(0,212,255,0.5)'
-            : 'rgba(16,217,160,0.7)',
+            : kind === 'fixed'
+            ? 'rgba(16,217,160,0.85)'
+            : 'rgba(255,255,255,0.15)',
           position: 1,
         },
         ...(hoverMessage ? { hoverMessage: { value: hoverMessage } } : {}),
       },
-    });
-  });
+    })
+  })
 
-  return result;
+  return result
 }
 
-// ─── CodeEditor Component ─────────────────────────────────────────────────────
-// Props:
-//   value, onChange, language   — standard
-//   decorationSpec              — Array<{ snippet: string, kind: 'bug'|'improvement'|'fixed'|'hover' }>
-//   onEditorReady               — callback(editor, monaco) — optional
 export default function CodeEditor({ value, onChange, language, decorationSpec = [], onEditorReady }) {
-  const editorRef    = useRef(null);
-  const monacoRef    = useRef(null);
-  const decoIdsRef   = useRef([]); // current active decoration ids
+  const editorRef = useRef(null)
+  const monacoRef = useRef(null)
+  const decoIdsRef = useRef([])
 
-  // Inject CSS once
-  useEffect(() => { injectCSS(); }, []);
+  useEffect(() => { injectCSS() }, [])
 
-  // Apply / update decorations whenever spec or value changes
   const applyDecorations = useCallback(() => {
-    const editor = editorRef.current;
-    const monaco = monacoRef.current;
-    if (!editor || !monaco) return;
+    const editor = editorRef.current
+    const monaco = monacoRef.current
 
-    const newDecos = buildDecorations(monaco, value, decorationSpec);
-    decoIdsRef.current = editor.deltaDecorations(decoIdsRef.current, newDecos);
-  }, [value, decorationSpec]);
+    if (!editor || !monaco) return
+
+    const newDecorations = buildDecorations(monaco, value, decorationSpec)
+    decoIdsRef.current = editor.deltaDecorations(decoIdsRef.current, newDecorations)
+  }, [value, decorationSpec])
 
   useEffect(() => {
-    applyDecorations();
-  }, [applyDecorations]);
+    applyDecorations()
+  }, [applyDecorations])
 
   const handleMount = (editor, monaco) => {
-    editorRef.current  = editor;
-    monacoRef.current  = monaco;
-    applyDecorations();
-    if (onEditorReady) onEditorReady(editor, monaco);
-  };
+    editorRef.current = editor
+    monacoRef.current = monaco
+    applyDecorations()
+
+    if (onEditorReady) {
+      onEditorReady(editor, monaco)
+    }
+  }
 
   return (
     <div className="w-full h-full relative">
@@ -172,10 +192,10 @@ export default function CodeEditor({ value, onChange, language, decorationSpec =
           language={LANG_MAP[language] || 'javascript'}
           theme="vs-dark"
           value={value}
-          onChange={(val) => onChange(val || '')}
+          onChange={(nextValue) => onChange(nextValue || '')}
           onMount={handleMount}
           options={{
-            minimap: { enabled: true },          // keep on so minimap colors show
+            minimap: { enabled: true },
             minimapScale: 2,
             fontSize: 13,
             lineHeight: 22,
@@ -189,12 +209,12 @@ export default function CodeEditor({ value, onChange, language, decorationSpec =
             cursorSmoothCaretAnimation: 'on',
             smoothScrolling: true,
             bracketPairColorization: { enabled: true },
-            glyphMargin: true,                   // needed for gutter colour
+            glyphMargin: true,
             overviewRulerLanes: 3,
           }}
           loading={<EditorFallback />}
         />
       </Suspense>
     </div>
-  );
+  )
 }
