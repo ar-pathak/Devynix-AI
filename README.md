@@ -153,7 +153,6 @@ Returns a fixed snippet or corrected file content, depending on the request cont
 
 ## Known gaps worth addressing next
 
-- Wire the auth pages to real navigation and backend auth flows.
 - Add a client-side service for `/api/fix` if you want server-driven fix application instead of local replacement only.
 - Add automated tests for the API validation and snippet replacement behavior.
 - Add deployment-specific settings such as production CORS configuration and public origin values for OpenRouter headers.
