@@ -153,7 +153,7 @@ function buildDecorations(monaco, code, decorationSpec) {
   return result
 }
 
-export default function CodeEditor({ value, onChange, language, decorationSpec = [], onEditorReady }) {
+export default function CodeEditor({ value, onChange, language, decorationSpec = [], focusRange, onEditorReady }) {
   const editorRef = useRef(null)
   const monacoRef = useRef(null)
   const decoIdsRef = useRef([])
@@ -173,6 +173,23 @@ export default function CodeEditor({ value, onChange, language, decorationSpec =
   useEffect(() => {
     applyDecorations()
   }, [applyDecorations])
+
+  useEffect(() => {
+    const editor = editorRef.current
+
+    if (!editor || !focusRange?.startLine) {
+      return
+    }
+
+    editor.revealLineInCenter(focusRange.startLine)
+    editor.setSelection({
+      startLineNumber: focusRange.startLine,
+      startColumn: 1,
+      endLineNumber: focusRange.endLine || focusRange.startLine,
+      endColumn: 1,
+    })
+    editor.focus()
+  }, [focusRange])
 
   const handleMount = (editor, monaco) => {
     editorRef.current = editor

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import CodeEditor from '../components/CodeEditor'
 import OutputPanel from '../components/OutputPanel'
 import AnalyzeButton from '../components/AnalyzeButton'
@@ -168,11 +168,15 @@ export default function WorkspacePage({ language }) {
   const [fixNotice, setFixNotice] = useState(null)
   const [fixedSnippets, setFixedSnippets] = useState([])
   const [hoverSnippet, setHoverSnippet] = useState(null)
+  const [focusRange, setFocusRange] = useState(null)
 
   const activeRequestRef = useRef(null)
   const fixedSnippetTimeoutsRef = useRef([])
   const prevLang = useRef(language)
-  const decorationSpec = buildDecorationSpec(analysisData, fixedSnippets, hoverSnippet)
+  const decorationSpec = useMemo(
+    () => buildDecorationSpec(analysisData, fixedSnippets, hoverSnippet),
+    [analysisData, fixedSnippets, hoverSnippet],
+  )
 
   useEffect(() => {
     return () => {
@@ -197,6 +201,7 @@ export default function WorkspacePage({ language }) {
     setFixedSnippets([])
     setHoverSnippet(null)
     setFixNotice(null)
+    setFocusRange(null)
   }, [language])
 
   const runAnalysis = async (nextCode) => {
@@ -260,6 +265,7 @@ export default function WorkspacePage({ language }) {
 
     setFixedSnippets([])
     setFixNotice(null)
+    setFocusRange(null)
     await runAnalysis(code)
   }
 
@@ -286,6 +292,10 @@ export default function WorkspacePage({ language }) {
 
       setCode(replacementResult.updatedCode)
       setHoverSnippet(null)
+      setFocusRange({
+        ...replacementResult.appliedRange,
+        id: `${type}-${index}-${Date.now()}`,
+      })
       flashAppliedSnippet({
         snippet: replacementResult.appliedSnippet,
         range: replacementResult.appliedRange,
@@ -367,6 +377,7 @@ export default function WorkspacePage({ language }) {
             onChange={setCode}
             language={language}
             decorationSpec={decorationSpec}
+            focusRange={focusRange}
           />
         </div>
 
