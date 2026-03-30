@@ -34,7 +34,7 @@ jobs:
 
       - name: Ping /health
         run: |
-          HEALTH_URL="${BACKEND_URL%/}/health"
+          HEALTH_URL="${BACKEND_URL%/}/api/health"
           echo "Pinging $HEALTH_URL"
           curl --fail --show-error --silent --location \
             --connect-timeout 10 \
