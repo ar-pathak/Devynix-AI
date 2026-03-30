@@ -1,0 +1,42 @@
+name: Keep Render Backend Awake
+
+on:
+  schedule:
+    # 09:00 IST to 21:00 IST on weekdays.
+    # Exact 14-minute cadence starting at 03:30 UTC ends at 15:24 UTC.
+    - cron: "30,44,58 3 * * 1-5"
+    - cron: "12,26,40,54 4,11 * * 1-5"
+    - cron: "8,22,36,50 5,12 * * 1-5"
+    - cron: "4,18,32,46 6,13 * * 1-5"
+    - cron: "0,14,28,42,56 7,14 * * 1-5"
+    - cron: "10,24,38,52 8 * * 1-5"
+    - cron: "6,20,34,48 9 * * 1-5"
+    - cron: "2,16,30,44,58 10 * * 1-5"
+    - cron: "10,24 15 * * 1-5"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping-backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      BACKEND_URL: ${{ vars.BACKEND_URL || secrets.BACKEND_URL }}
+    steps:
+      - name: Validate backend URL
+        run: |
+          if [ -z "$BACKEND_URL" ]; then
+            echo "BACKEND_URL is not set."
+            echo "Add it as a GitHub repository variable or secret before using this workflow."
+            exit 1
+          fi
+
+      - name: Ping /health
+        run: |
+          HEALTH_URL="${BACKEND_URL%/}/health"
+          echo "Pinging $HEALTH_URL"
+          curl --fail --show-error --silent --location \
+            --connect-timeout 10 \
+            --max-time 30 \
+            "$HEALTH_URL"
